@@ -1,0 +1,7 @@
+DEBUG: true
+
+TRAIN:
+  epochs: 1
+  learning_rate: 0.00008
+  gpu_id: 2
+  num_workers: 2

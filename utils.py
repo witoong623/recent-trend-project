@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import albumentations as album
@@ -109,3 +110,11 @@ def get_preprocessing(preprocessing_fn=None):
     _transform.append(album.Lambda(image=to_tensor, mask=to_tensor))
         
     return album.Compose(_transform)
+
+
+def save_history(data, name, history_type):
+    ''' save history in pickle, name is full path to the file '''
+    if history_type == 'loss':
+        pickle.dump(data, open(name, 'wb+'))
+    else:
+        raise ValueError('history_type must be one of [loss]')

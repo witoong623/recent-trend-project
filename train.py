@@ -1,16 +1,18 @@
+import argparse
 import dataset_utils
+import os
 import torch
 import segmentation_models_pytorch as smp
-from torch.utils.data import DataLoader
+from config import cfg
 from datasets import LandCoverDataset
-from utils import get_validation_augmentation, get_training_augmentation, get_preprocessing
 from models.deeplab import get_model as get_deeplab_model
+from torch.utils.data import DataLoader, Subset
+from utils import get_validation_augmentation, get_training_augmentation, get_preprocessing, save_history
 
 LANDCOVER_ROOT = '/root/deepglobe'
 
-def training(model, train_loader, val_loader):
-    epoch = 5
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def training(model, train_loader, val_loader, cfg):
+    DEVICE = torch.device(f'cuda:{cfg.TRAIN.gpu_id}' if torch.cuda.is_available() else "cpu")
 
     loss = smp.utils.losses.DiceLoss()
 
@@ -20,7 +22,7 @@ def training(model, train_loader, val_loader):
 
     # define optimizer
     optimizer = torch.optim.Adam([ 
-        dict(params=model.parameters(), lr=0.00008),
+        dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate),
     ])
 
     # define learning rate scheduler (not used in this NB)
@@ -53,7 +55,7 @@ def training(model, train_loader, val_loader):
     best_iou_score = 0.0
     train_logs_list, valid_logs_list = [], []
 
-    for i in range(0, epoch):
+    for i in range(0, cfg.TRAIN.epochs):
         # Perform training & validation
         train_logs = train_epoch.run(train_loader)
         valid_logs = valid_epoch.run(val_loader)
@@ -67,12 +69,35 @@ def training(model, train_loader, val_loader):
             torch.save(model, './best_model.pth')
             print('Model saved!')
 
-    print(f'train finished')
+    print('train finished')
+
+    save_history((cfg.TRAIN, train_logs_list), os.path.join(cfg.TRAIN.history_dir, f'{cfg.MODEL.name}.pickle'), 'loss')
+    save_history((cfg.VAL, valid_logs_list), os.path.join(cfg.VAL.history_dir, f'{cfg.MODEL.name}.pickle'), 'loss')
+
+    print('save histories finished')
 
 
 if __name__ == '__main__':
+    # config prep
+    parser = argparse.ArgumentParser(
+        description="RTML deep globe traning"
+    )
+
+    parser.add_argument(
+        "--cfg",
+        default="cfg/deeplab_resnet.yaml",
+        metavar="FILE",
+        help="path to config file",
+        type=str,
+    )
+    args = parser.parse_args()
+    cfg.merge_from_file(args.cfg)
+    cfg.freeze()
+
+    print(cfg)
+
     # get information about dataset
-    train_df, val_df = dataset_utils.get_landcover_train_val_df(LANDCOVER_ROOT, random_state=42)
+    train_df, val_df = dataset_utils.get_landcover_train_val_df(LANDCOVER_ROOT, random_state=cfg.SEED)
     dataset_info = dataset_utils.get_landcover_info(LANDCOVER_ROOT)
     class_names = dataset_info['class_names']
     class_rgb_values = dataset_info['class_rgb_values']
@@ -97,8 +122,13 @@ if __name__ == '__main__':
         class_rgb_values=select_class_rgb_values,
     )
 
-    # Get train and val data loaders
-    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=2)
-    val_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=4)
+    if cfg.DEBUG:
+        # if I only want to debug code, train and val only for 10 samples
+        train_dataset = Subset(train_dataset, [n for n in range(10)])
+        valid_dataset = Subset(valid_dataset, [n for n in range(10)])
 
-    training(model, train_loader, val_loader)
+    # Get train and val data loaders
+    train_loader = DataLoader(train_dataset, batch_size=cfg.TRAIN.batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=cfg.TRAIN.num_workers)
+    val_loader = DataLoader(valid_dataset, batch_size=cfg.VAL.num_workers, shuffle=False, pin_memory=True, num_workers=cfg.VAL.num_workers)
+
+    training(model, train_loader, val_loader, cfg)
