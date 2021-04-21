@@ -1,7 +1,11 @@
-DEBUG: true
+DEBUG: false
 
 TRAIN:
-  epochs: 1
+  epochs: 25
   learning_rate: 0.00008
-  gpu_id: 2
+  gpu_id: 0
+  num_workers: 2
+  momentum: 0.9
+  weight_decay: 1e-4
+VAL:
   num_workers: 2

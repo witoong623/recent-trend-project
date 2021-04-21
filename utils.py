@@ -1,7 +1,10 @@
+import os
 import pickle
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import albumentations as album
+from datetime import datetime
 
 
 # helper function for data visualization
@@ -112,9 +115,19 @@ def get_preprocessing(preprocessing_fn=None):
     return album.Compose(_transform)
 
 
-def save_history(data, name, history_type):
+def save_history(data, name, dir):
     ''' save history in pickle, name is full path to the file '''
-    if history_type == 'loss':
-        pickle.dump(data, open(name, 'wb+'))
-    else:
-        raise ValueError('history_type must be one of [loss]')
+
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+
+    name = f'{name}.pickle'
+    pickle.dump(data, open(os.path.join(dir, name), 'wb+'))
+
+
+def save_model(model, name, dir):
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+
+    name = f'{name}.pth'
+    torch.save(model.state_dict(), os.path.join(dir, name))

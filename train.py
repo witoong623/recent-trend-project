@@ -7,7 +7,7 @@ from config import cfg
 from datasets import LandCoverDataset
 from models.deeplab import get_model as get_deeplab_model
 from torch.utils.data import DataLoader, Subset
-from utils import get_validation_augmentation, get_training_augmentation, get_preprocessing, save_history
+from utils import get_validation_augmentation, get_training_augmentation, get_preprocessing, save_history, save_model
 
 LANDCOVER_ROOT = '/root/deepglobe'
 
@@ -21,14 +21,20 @@ def training(model, train_loader, val_loader, cfg):
     ]
 
     # define optimizer
-    optimizer = torch.optim.Adam([ 
-        dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate),
+    # optimizer = torch.optim.SGD([ 
+    #     dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate, momentum=cfg.TRAIN.momentum)
+    # ])
+
+    optimizer = torch.optim.Adam([
+        dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate)
     ])
 
     # define learning rate scheduler (not used in this NB)
     # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     #     optimizer, T_0=1, T_mult=2, eta_min=5e-5,
     # )
+
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
     # load best saved model checkpoint from previous commit (if present)
     # if os.path.exists('../input/deepglobe-land-cover-classification-deeplabv3/best_model.pth'):
@@ -63,16 +69,19 @@ def training(model, train_loader, val_loader, cfg):
         train_logs_list.append(train_logs)
         valid_logs_list.append(valid_logs)
 
+        lr_scheduler.step(valid_logs['dice_loss'])
+
         # Save model if a better val IoU score is obtained
         if best_iou_score < valid_logs['iou_score']:
             best_iou_score = valid_logs['iou_score']
-            torch.save(model, './best_model.pth')
-            print('Model saved!')
+
+            save_model(model, 'best_model', os.path.join(cfg.weight_dir, cfg.MODEL.name))
 
     print('train finished')
 
-    save_history((cfg.TRAIN, train_logs_list), os.path.join(cfg.TRAIN.history_dir, f'{cfg.MODEL.name}.pickle'), 'loss')
-    save_history((cfg.VAL, valid_logs_list), os.path.join(cfg.VAL.history_dir, f'{cfg.MODEL.name}.pickle'), 'loss')
+    model_name = cfg.MODEL.name
+    save_history((cfg.TRAIN, train_logs_list), f'{model_name}_train', os.path.join(cfg.history_dir, model_name))
+    save_history((cfg.VAL, valid_logs_list), f'{model_name}_val', os.path.join(cfg.history_dir, model_name))
 
     print('save histories finished')
 
