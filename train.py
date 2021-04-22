@@ -1,4 +1,5 @@
 import argparse
+import copy
 import dataset_utils
 import os
 import torch
@@ -30,11 +31,14 @@ def training(model, train_loader, val_loader, cfg):
     ])
 
     # define learning rate scheduler (not used in this NB)
-    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-    #     optimizer, T_0=1, T_mult=2, eta_min=5e-5,
-    # )
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=1, T_mult=2, eta_min=5e-5,
+    )
 
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+    # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.7)
+    # lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, step_size=5, gamma=0.8)
+
 
     # load best saved model checkpoint from previous commit (if present)
     # if os.path.exists('../input/deepglobe-land-cover-classification-deeplabv3/best_model.pth'):
@@ -61,7 +65,14 @@ def training(model, train_loader, val_loader, cfg):
     best_iou_score = 0.0
     train_logs_list, valid_logs_list = [], []
 
+    best_model = model
+
     for i in range(0, cfg.TRAIN.epochs):
+        # use the best model
+        model = best_model
+        train_epoch.model = model
+        valid_epoch.model = model
+
         # Perform training & validation
         train_logs = train_epoch.run(train_loader)
         valid_logs = valid_epoch.run(val_loader)
@@ -69,13 +80,16 @@ def training(model, train_loader, val_loader, cfg):
         train_logs_list.append(train_logs)
         valid_logs_list.append(valid_logs)
 
-        lr_scheduler.step(valid_logs['dice_loss'])
+        lr_scheduler.step(i + 1)
 
         # Save model if a better val IoU score is obtained
         if best_iou_score < valid_logs['iou_score']:
             best_iou_score = valid_logs['iou_score']
 
-            save_model(model, 'best_model', os.path.join(cfg.weight_dir, cfg.MODEL.name))
+            # model = model.cpu()
+            best_model = copy.deepcopy(model)
+
+            save_model(best_model, 'best_model', os.path.join(cfg.weight_dir, cfg.MODEL.name))
 
     print('train finished')
 
@@ -114,7 +128,10 @@ if __name__ == '__main__':
 
     num_classes = len(select_class_rgb_values)
 
-    model, preprocessing_fn = get_deeplab_model(num_classes)
+    if cfg.MODEL.name.endswith('resnet'):
+        model, preprocessing_fn = get_deeplab_model(num_classes, 'resnet50')
+    elif cfg.MODEL.name.endswith('densenet'):
+        model, preprocessing_fn = get_deeplab_model(num_classes, 'densenet201')
 
     # Get train and val dataset instances
     train_dataset = LandCoverDataset(

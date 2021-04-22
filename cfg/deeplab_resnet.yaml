@@ -3,9 +3,10 @@ DEBUG: false
 TRAIN:
   epochs: 25
   learning_rate: 0.00008
-  gpu_id: 0
+  gpu_id: 3
   num_workers: 2
   momentum: 0.9
   weight_decay: 1e-4
+  batch_size: 3
 VAL:
   num_workers: 2
