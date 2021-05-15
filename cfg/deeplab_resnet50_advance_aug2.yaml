@@ -1,0 +1,15 @@
+DEBUG: false
+
+MODEL:
+  name: "deeplabv3_resnet50_advance_aug2"
+TRAIN:
+  epochs: 20
+  learning_rate: 0.00008
+  augment_type: 'advance'
+  num_workers: 2
+  batch_size: 4
+  multi_gpus: [2, 3]
+VAL:
+  num_workers: 2
+  multi_gpus: [2, 3]
+  batch_size: 4

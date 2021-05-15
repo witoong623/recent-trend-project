@@ -1,0 +1,18 @@
+DEBUG: false
+
+MODEL:
+  name: "deeplabv3_resnet100_advance_aug"
+  encoder: "resnet101"
+DATASET:
+  use_unknown: false
+TRAIN:
+  epochs: 25
+  learning_rate: 0.00008
+  augment_type: 'advance'
+  num_workers: 3
+  batch_size: 4
+  multi_gpus: [2, 3]
+VAL:
+  num_workers: 3
+  multi_gpus: [2, 3]
+  batch_size: 4

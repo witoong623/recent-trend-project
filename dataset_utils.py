@@ -23,7 +23,7 @@ def get_landcover_train_val_df(root_path, val_fraction=0.1, random_state=None):
     return train_df, valid_df
 
 
-def get_landcover_info(root_path, verbose=False):
+def get_landcover_info(root_path, include_unknow=True, verbose=False):
     class_dict = pd.read_csv(os.path.join(root_path, 'class_dict.csv'))
     # Get class names
     class_names = class_dict['name'].tolist()
@@ -35,8 +35,13 @@ def get_landcover_info(root_path, verbose=False):
         print('Class Names: ', class_names)
         print('Class RGB values: ', class_rgb_values)
 
-        # Useful to shortlist specific classes in datasets with large number of classes
-    select_classes = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land', 'unknown']
+    # Useful to shortlist specific classes in datasets with large number of classes
+    if include_unknow:
+        select_classes = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land', 'unknown']
+    else:
+        select_classes = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land']
+
+
 
     # Get RGB values of required classes
     select_class_indices = [class_names.index(cls.lower()) for cls in select_classes]

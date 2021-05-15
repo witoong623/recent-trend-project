@@ -1,5 +1,6 @@
 import cv2
 import torch
+import numpy as np
 from utils import one_hot_encode
 
 
@@ -22,6 +23,7 @@ class LandCoverDataset(torch.utils.data.Dataset):
             class_rgb_values=None, 
             augmentation=None, 
             preprocessing=None,
+            increase_dataset=1
     ):
         self.image_paths = df['sat_image_path'].tolist()
         self.mask_paths = df['mask_path'].tolist()
@@ -29,6 +31,7 @@ class LandCoverDataset(torch.utils.data.Dataset):
         self.class_rgb_values = class_rgb_values
         self.augmentation = augmentation
         self.preprocessing = preprocessing
+        self.increa
     
     def __getitem__(self, i):
         
@@ -53,4 +56,4 @@ class LandCoverDataset(torch.utils.data.Dataset):
         
     def __len__(self):
         # return length of 
-        return len(self.image_paths)
+        return len(self.image_paths) * self.increase_dataset

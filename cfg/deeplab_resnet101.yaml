@@ -1,6 +1,7 @@
 DEBUG: false
 
-
+MODEL:
+  name: 'deeplabv3_resnet101'
 TRAIN:
   epochs: 25
   learning_rate: 0.00008
@@ -8,6 +9,6 @@ TRAIN:
   num_workers: 2
   momentum: 0.9
   weight_decay: 1e-4
-  batch_size: 3
+  batch_size: 2
 VAL:
   num_workers: 2

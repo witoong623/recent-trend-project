@@ -1,10 +1,13 @@
 import os
 import pickle
+from albumentations.augmentations.transforms import Rotate
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import albumentations as album
 from datetime import datetime
+
+from torch._C import Value
 
 
 # helper function for data visualization
@@ -79,12 +82,36 @@ def colour_code_segmentation(image, label_values):
     return x
 
 
-def get_training_augmentation():
-    train_transform = [
-        album.RandomCrop(height=1024, width=1024, always_apply=True),
-        album.HorizontalFlip(p=0.5),
-        album.VerticalFlip(p=0.5),
-    ]
+def get_training_augmentation(type='basic'):
+    if type == 'basic':
+        train_transform = [
+            album.RandomCrop(height=1024, width=1024, always_apply=True),
+            album.HorizontalFlip(p=0.5),
+            album.VerticalFlip(p=0.5),
+        ]
+    elif type == 'advance':
+        train_transform = [
+            album.RandomCrop(height=1024, width=1024, always_apply=True),
+            album.HorizontalFlip(p=0.5),
+            album.VerticalFlip(p=0.5),
+            album.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25),
+            album.HueSaturationValue(p=0.5),
+            album.Blur(blur_limit=7, p=0.5),
+            album.ToGray(p=0.5),
+            album.IAASharpen(p=0.5),
+        ]
+    elif type == 'intermediate':
+        train_transform = [
+            album.RandomCrop(height=1024, width=1024, always_apply=True),
+            album.HorizontalFlip(p=0.5),
+            album.VerticalFlip(p=0.5),
+            album.Rotate(limit=90, p=0.5),
+            album.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25),
+            album.HueSaturationValue(p=0.5),
+        ]
+    else:
+        raise ValueError(f'type {type} is not supported')
+
     return album.Compose(train_transform)
 
 
@@ -97,6 +124,21 @@ def get_validation_augmentation():
 
 def to_tensor(x, **kwargs):
     return x.transpose(2, 0, 1).astype('float32')
+
+
+dataset_mean = np.array([147.2528, 160.7285,  75.4926]) / 255
+dataset_std = np.array([0.3661, 0.3492, 0.3359])
+
+def no_pretrain_precessing(x, **kwargs):
+    if x.max() > 1:
+        x = x / 255
+    else:
+        raise ValueError('image has invalid data')
+
+    x = x - dataset_mean
+    x = x / dataset_std
+
+    return x
 
 
 def get_preprocessing(preprocessing_fn=None):

@@ -9,12 +9,17 @@ from datasets import LandCoverDataset
 from models.deeplab import get_model as get_deeplab_model
 from torch.utils.data import DataLoader, Subset
 from utils import get_validation_augmentation, get_training_augmentation, get_preprocessing, save_history, save_model
+from train_utils import TrainEpochMultiGPU, ValidEpochMultiGPU
 
 LANDCOVER_ROOT = '/root/deepglobe'
 
 def training(model, train_loader, val_loader, cfg):
-    DEVICE = torch.device(f'cuda:{cfg.TRAIN.gpu_id}' if torch.cuda.is_available() else "cpu")
+    if len(cfg.TRAIN.multi_gpus) > 1:
+        DEVICE = cfg.TRAIN.multi_gpus
+    else:
+        DEVICE = torch.device(f'cuda:{cfg.TRAIN.gpu_id}' if torch.cuda.is_available() else "cpu")
 
+    # index (or channel) 6 in ground truth is unknow
     loss = smp.utils.losses.DiceLoss()
 
     metrics = [
@@ -22,13 +27,14 @@ def training(model, train_loader, val_loader, cfg):
     ]
 
     # define optimizer
-    # optimizer = torch.optim.SGD([ 
-    #     dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate, momentum=cfg.TRAIN.momentum)
-    # ])
-
-    optimizer = torch.optim.Adam([
-        dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate)
-    ])
+    if cfg.TRAIN.optimizer == 'sgd':
+        optimizer = torch.optim.SGD([ 
+            dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate, momentum=cfg.TRAIN.momentum)
+        ])
+    elif cfg.TRAIN.optimizer == 'adam':
+        optimizer = torch.optim.Adam([
+            dict(params=model.parameters(), lr=cfg.TRAIN.learning_rate)
+        ])
 
     # define learning rate scheduler (not used in this NB)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
@@ -45,7 +51,7 @@ def training(model, train_loader, val_loader, cfg):
     #     model = torch.load('../input/deepglobe-land-cover-classification-deeplabv3/best_model.pth', map_location=DEVICE)
     #     print('Loaded pre-trained DeepLabV3+ model!')
 
-    train_epoch = smp.utils.train.TrainEpoch(
+    train_epoch = TrainEpochMultiGPU(
         model, 
         loss=loss, 
         metrics=metrics, 
@@ -54,7 +60,7 @@ def training(model, train_loader, val_loader, cfg):
         verbose=True,
     )
 
-    valid_epoch = smp.utils.train.ValidEpoch(
+    valid_epoch = ValidEpochMultiGPU(
         model, 
         loss=loss, 
         metrics=metrics, 
@@ -64,15 +70,9 @@ def training(model, train_loader, val_loader, cfg):
 
     best_iou_score = 0.0
     train_logs_list, valid_logs_list = [], []
-
-    best_model = model
+    model_name = cfg.MODEL.name
 
     for i in range(0, cfg.TRAIN.epochs):
-        # use the best model
-        model = best_model
-        train_epoch.model = model
-        valid_epoch.model = model
-
         # Perform training & validation
         train_logs = train_epoch.run(train_loader)
         valid_logs = valid_epoch.run(val_loader)
@@ -82,22 +82,16 @@ def training(model, train_loader, val_loader, cfg):
 
         lr_scheduler.step(i + 1)
 
+        save_history((cfg.TRAIN, train_logs_list), f'{model_name}_epoch{i+1}_train', os.path.join(cfg.history_dir, model_name))
+        save_history((cfg.VAL, valid_logs_list), f'{model_name}_epoch{i+1}_val', os.path.join(cfg.history_dir, model_name))
+
         # Save model if a better val IoU score is obtained
         if best_iou_score < valid_logs['iou_score']:
             best_iou_score = valid_logs['iou_score']
 
-            # model = model.cpu()
-            best_model = copy.deepcopy(model)
-
-            save_model(best_model, 'best_model', os.path.join(cfg.weight_dir, cfg.MODEL.name))
+            save_model(model, 'best_model', os.path.join(cfg.weight_dir, cfg.MODEL.name))
 
     print('train finished')
-
-    model_name = cfg.MODEL.name
-    save_history((cfg.TRAIN, train_logs_list), f'{model_name}_train', os.path.join(cfg.history_dir, model_name))
-    save_history((cfg.VAL, valid_logs_list), f'{model_name}_val', os.path.join(cfg.history_dir, model_name))
-
-    print('save histories finished')
 
 
 if __name__ == '__main__':
@@ -121,22 +115,19 @@ if __name__ == '__main__':
 
     # get information about dataset
     train_df, val_df = dataset_utils.get_landcover_train_val_df(LANDCOVER_ROOT, random_state=cfg.SEED)
-    dataset_info = dataset_utils.get_landcover_info(LANDCOVER_ROOT)
+    dataset_info = dataset_utils.get_landcover_info(LANDCOVER_ROOT, include_unknow=False)
     class_names = dataset_info['class_names']
     class_rgb_values = dataset_info['class_rgb_values']
     select_class_rgb_values = dataset_info['select_class_rgb_values']
 
     num_classes = len(select_class_rgb_values)
 
-    if cfg.MODEL.name.endswith('resnet'):
-        model, preprocessing_fn = get_deeplab_model(num_classes, 'resnet50')
-    elif cfg.MODEL.name.endswith('densenet'):
-        model, preprocessing_fn = get_deeplab_model(num_classes, 'densenet201')
+    model, preprocessing_fn = get_deeplab_model(num_classes, cfg.MODEL.encoder)
 
     # Get train and val dataset instances
     train_dataset = LandCoverDataset(
         train_df, 
-        augmentation=get_training_augmentation(),
+        augmentation=get_training_augmentation(cfg.TRAIN.augment_type),
         preprocessing=get_preprocessing(preprocessing_fn),
         class_rgb_values=select_class_rgb_values,
     )

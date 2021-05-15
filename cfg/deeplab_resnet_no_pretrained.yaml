@@ -1,8 +1,10 @@
 DEBUG: false
 
-
+MODEL:
+  name: "deeplabv3_resnet50_nopretrain"
+  pretrained_weight: null
 TRAIN:
-  epochs: 25
+  epochs: 30
   learning_rate: 0.00008
   gpu_id: 3
   num_workers: 2

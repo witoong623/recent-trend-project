@@ -1,0 +1,19 @@
+DEBUG: false
+
+MODEL:
+  name: "deeplabv3_resnet50_advance_aug_sgd"
+DATASET:
+  use_unknown: false
+TRAIN:
+  epochs: 25
+  learning_rate: 0.001
+  optimizer: 'sgd'
+  momentum: 0.9
+  augment_type: 'advance'
+  num_workers: 3
+  batch_size: 4
+  multi_gpus: [2, 3]
+VAL:
+  num_workers: 3
+  multi_gpus: [2, 3]
+  batch_size: 4
