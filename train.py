@@ -146,6 +146,6 @@ if __name__ == '__main__':
 
     # Get train and val data loaders
     train_loader = DataLoader(train_dataset, batch_size=cfg.TRAIN.batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=cfg.TRAIN.num_workers)
-    val_loader = DataLoader(valid_dataset, batch_size=cfg.VAL.num_workers, shuffle=False, pin_memory=True, num_workers=cfg.VAL.num_workers)
+    val_loader = DataLoader(valid_dataset, batch_size=cfg.VAL.batch_size, shuffle=False, pin_memory=True, num_workers=cfg.VAL.num_workers)
 
     training(model, train_loader, val_loader, cfg)

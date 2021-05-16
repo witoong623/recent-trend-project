@@ -23,7 +23,8 @@ class LandCoverDataset(torch.utils.data.Dataset):
             class_rgb_values=None, 
             augmentation=None, 
             preprocessing=None,
-            increase_dataset=1
+            increase_dataset=1,
+            return_path=False
     ):
         self.image_paths = df['sat_image_path'].tolist()
         self.mask_paths = df['mask_path'].tolist()
@@ -31,14 +32,35 @@ class LandCoverDataset(torch.utils.data.Dataset):
         self.class_rgb_values = class_rgb_values
         self.augmentation = augmentation
         self.preprocessing = preprocessing
-        self.increa
-    
+        self.increase_dataset = increase_dataset
+        self.return_path = return_path
+
+    def get_from_paths(self, image_path, mask_path):
+        image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        mask = cv2.cvtColor(cv2.imread(mask_path), cv2.COLOR_BGR2RGB)
+
+        proced_image, proced_mask = self._process(image, mask)
+
+        if self.return_path:
+            return proced_image, proced_mask, image_path
+
+        return proced_image, proced_mask
+
     def __getitem__(self, i):
-        
         # read images and masks
-        image = cv2.cvtColor(cv2.imread(self.image_paths[i]), cv2.COLOR_BGR2RGB)
+        image_path = self.image_paths[i]
+        image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
         mask = cv2.cvtColor(cv2.imread(self.mask_paths[i]), cv2.COLOR_BGR2RGB)
-        
+
+        proced_image, proced_mask = self._process(image, mask)
+
+        if self.return_path:
+            return proced_image, proced_mask, image_path
+
+        return proced_image, proced_mask
+
+
+    def _process(self, image, mask):
         # one-hot-encode the mask
         mask = one_hot_encode(mask, self.class_rgb_values).astype('float')
         
@@ -53,7 +75,7 @@ class LandCoverDataset(torch.utils.data.Dataset):
             image, mask = sample['image'], sample['mask']
             
         return image, mask
-        
+
     def __len__(self):
         # return length of 
         return len(self.image_paths) * self.increase_dataset

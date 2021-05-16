@@ -24,6 +24,7 @@ def visualize(**images):
         # get title from the parameter names
         plt.title(name.replace('_',' ').title(), fontsize=20)
         plt.imshow(image)
+    plt.savefig('sample_gt_pred_2_max.jpeg')
     plt.show()
 
 # Perform one hot encoding on label
@@ -151,8 +152,8 @@ def get_preprocessing(preprocessing_fn=None):
     """
     _transform = []
     if preprocessing_fn:
-        _transform.append(album.Lambda(image=preprocessing_fn))
-    _transform.append(album.Lambda(image=to_tensor, mask=to_tensor))
+        _transform.append(album.Lambda(name='Model preprocessing', image=preprocessing_fn))
+    _transform.append(album.Lambda(name='To tensor', image=to_tensor, mask=to_tensor))
         
     return album.Compose(_transform)
 
